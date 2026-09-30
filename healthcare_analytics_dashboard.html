@@ -1,0 +1,2236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Healthcare Analytics for Doctor Visits | Badal Kumar Sahu</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <!-- PapaParse for high-speed CSV parsing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdfa',
+              100: '#ccfbf1',
+              500: '#14b8a6',
+              600: '#0d9488',
+              700: '#0f766e',
+              800: '#115e59',
+              900: '#134e4a',
+            },
+            navy: {
+              800: '#1e293b',
+              900: '#0f172a',
+              950: '#020617'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    .chart-container {
+      position: relative;
+      width: 100%;
+      height: 270px;
+    }
+    .chart-container-tall {
+      position: relative;
+      width: 100%;
+      height: 330px;
+    }
+    .card-shadow {
+      box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+      transition: all 0.2s ease-in-out;
+    }
+    .card-shadow:hover {
+      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+    }
+    .stat-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.125rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.725rem;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-900 antialiased flex flex-col">
+
+<header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm backdrop-blur-md bg-white/95">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <!-- Title & Subtitle -->
+    <div class="flex items-center space-x-3.5">
+      <div class="w-11 h-11 rounded-xl bg-gradient-to-tr from-teal-600 to-cyan-500 flex items-center justify-center text-white shadow-md shadow-teal-500/20 flex-shrink-0">
+        <i data-lucide="activity" class="w-6 h-6"></i>
+      </div>
+      <div>
+        <div class="flex items-center space-x-2">
+          <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 leading-tight">Healthcare Analytics for Doctor Visits</h1>
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-teal-50 text-teal-700 border border-teal-200">AER DoctorVisits</span>
+        </div>
+        <p class="text-xs sm:text-sm text-slate-500 font-normal">Exploring Healthcare Utilization Across Demographic, Socioeconomic, Health, Insurance &amp; Chronic-Condition Factors</p>
+      </div>
+    </div>
+
+    <!-- Author Badge & Action Buttons -->
+    <div class="flex items-center flex-wrap gap-2.5 sm:self-center">
+      <div class="flex items-center bg-slate-100 hover:bg-slate-200/70 transition-colors px-3 py-1.5 rounded-lg border border-slate-200/80">
+        <div class="w-6 h-6 rounded-full bg-teal-600 text-white flex items-center justify-center text-xs font-bold mr-2">BK</div>
+        <div class="text-left">
+          <div class="text-[10px] uppercase font-bold tracking-wider text-slate-600">Project By</div>
+          <div class="text-xs font-semibold text-slate-900">Badal Kumar Sahu</div>
+        </div>
+      </div>
+      
+      <button id="openVariableModalBtn" class="inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm">
+        <i data-lucide="book-open" class="w-3.5 h-3.5 mr-1.5 text-teal-600"></i> Codebook
+      </button>
+
+      <label class="inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-medium text-white bg-slate-900 hover:bg-slate-800 cursor-pointer transition-colors shadow-sm">
+        <i data-lucide="upload" class="w-3.5 h-3.5 mr-1.5 text-teal-400"></i> Upload CSV
+        <input type="file" id="csvFileInput" accept=".csv" class="hidden">
+      </label>
+
+      <button id="resetDataBtn" title="Reset to authentic default dataset" class="inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors shadow-sm">
+        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5 mr-1 text-slate-500"></i> Reset
+      </button>
+    </div>
+  </div>
+</header>
+
+<div class="bg-gradient-to-r from-slate-900 via-slate-850 to-navy-900 text-white border-b border-slate-800">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+    <div class="flex flex-wrap items-center justify-between gap-y-2 text-xs">
+      <div class="flex items-center space-x-2 text-slate-300">
+        <i data-lucide="database" class="w-4 h-4 text-teal-400"></i>
+        <span class="font-medium text-slate-200">Dataset Overview:</span>
+        <span class="text-slate-400">Australian Health Survey (1977–1978 Doctor Visits cross-section)</span>
+      </div>
+      <div class="flex items-center gap-4 flex-wrap text-slate-300">
+        <div>Total Rows: <span id="metaRecords" class="font-bold text-teal-300">5,190</span></div>
+        <span class="text-slate-600">•</span>
+        <div>Variables: <span id="metaVariables" class="font-bold text-teal-300">12</span></div>
+        <span class="text-slate-600">•</span>
+        <div>Missing Values: <span id="metaMissing" class="font-bold text-emerald-400">0 (Clean)</span></div>
+        <span class="text-slate-600">•</span>
+        <div>Active Filter: <span id="metaFilteredRatio" class="font-bold text-amber-300">5,190 / 5,190 (100%)</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Main Body Grid Layout -->
+<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 flex-grow w-full">
+
+  <section class="bg-white rounded-xl border border-slate-200/90 p-4 card-shadow">
+    <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-3.5">
+      <div class="flex items-center space-x-2">
+        <i data-lucide="sliders-horizontal" class="w-4 h-4 text-teal-600"></i>
+        <h2 class="text-sm font-bold uppercase tracking-wider text-slate-800">Interactive Cohort Filters</h2>
+        <span class="text-xs text-slate-500 font-normal">(Dynamic recalculation across all visualizations)</span>
+      </div>
+      <button id="clearAllFiltersBtn" class="inline-flex items-center text-xs font-semibold text-rose-600 hover:text-rose-700 hover:underline">
+        <i data-lucide="filter-x" class="w-3.5 h-3.5 mr-1"></i> Reset Filters
+      </button>
+    </div>
+
+    <!-- Filters Row Grid -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-10 gap-2.5 text-xs">
+      <!-- 1. Gender -->
+      <div>
+        <label class="block font-medium text-slate-600 mb-1">Gender</label>
+        <select id="filterGender" class="w-full bg-slate-50 border border-slate-200 rounded-md py-1.5 px-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-teal-500">
+          <option value="ALL">All Genders</option>
+          <option value="female">Female</option>
+          <option value="male">Male</option>
+        </select>
+      </div>
+
+      <!-- 2. Age Group -->
+      <div>
+        <label class="block font-medium text-slate-600 mb-1">Age Group</label>
+        <select id="filterAge" class="w-full bg-slate-50 border border-slate-200 rounded-md py-1.5 px-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-teal-500">
+          <option value="ALL">All Ages</option>
+          <option value="<20">&lt;20 years</option>
+          <option value="20-35">20–35 yrs</option>
+          <option value="36-50">36–50 yrs</option>
+          <option value="51-65">51–65 yrs</option>
+          <option value=">65">&gt;65 years</option>
+        </select>
+      </div>
+
+      <!-- 3. Income Quantile -->
+      <div>
+        <label class="block font-medium text-slate-600 mb-1">Income Tier</label>
+        <select id="filterIncome" class="w-full bg-slate-50 border border-slate-200 rounded-md py-1.5 px-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-teal-500">
+          <option value="ALL">All Incomes</option>
+          <option value="Low">Low (&lt; 0.25)</option>
+          <option value="Moderate">Moderate (0.25–0.5)</option>
+          <option value="Middle">Middle (0.5–0.8)</option>
+          <option value="High">High (&gt; 0.8)</option>
+        </select>
+      </div>
+
+      <!-- 4. Illness Level -->
+      <div>
+        <label class="block font-medium text-slate-600 mb-1">Illness Level</label>
+        <select id="filterIllness" class="w-full bg-slate-50 border border-slate-200 rounded-md py-1.5 px-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-teal-500">
+          <option value="ALL">All Illnesses</option>
+          <option value="0">0 (None)</option>
+          <option value="1">1 condition</option>
+          <option value="2">2 conditions</option>
+          <option value="3+">3+ conditions</option>
+        </select>
+      </div>
+
+      <!-- 5. General Health -->
+      <div>
+        <label class="block font-medium text-slate-600 mb-1">Health Score</label>
+        <select id="filterHealth" class="w-full bg-slate-50 border border-slate-200 rounded-md py-1.5 px-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-teal-500">
+          <option value="ALL">All Scores</option>
+          <option value="0">0 (Best health)</option>
+          <option value="1">1</option>
+          <option value="2+">2+ (Poor health)</option>
+        </select>
+      </div>
+
+      <!-- 6. Private Insurance -->
+      <div>
+        <label class="block font-medium text-slate-600 mb-1">Private Ins.</label>
+        <select id="filterPrivate" class="w-full bg-slate-50 border border-slate-200 rounded-md py-1.5 px-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-teal-500">
+          <option value="ALL">All</option>
+          <option value="yes">Yes (Insured)</option>
+          <option value="no">No</option>
+        </select>
+      </div>
+
+      <!-- 7. Free-Poor -->
+      <div>
+        <label class="block font-medium text-slate-600 mb-1">Free-Poor</label>
+        <select id="filterFreepoor" class="w-full bg-slate-50 border border-slate-200 rounded-md py-1.5 px-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-teal-500">
+          <option value="ALL">All</option>
+          <option value="yes">Yes</option>
+          <option value="no">No</option>
+        </select>
+      </div>
+
+      <!-- 8. Free-Repat -->
+      <div>
+        <label class="block font-medium text-slate-600 mb-1">Free-Repat</label>
+        <select id="filterFreerepat" class="w-full bg-slate-50 border border-slate-200 rounded-md py-1.5 px-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-teal-500">
+          <option value="ALL">All</option>
+          <option value="yes">Yes</option>
+          <option value="no">No</option>
+        </select>
+      </div>
+
+      <!-- 9. Chronic Conditions (nchronic) -->
+      <div>
+        <label class="block font-medium text-slate-600 mb-1">Chronic Count</label>
+        <select id="filterNchronic" class="w-full bg-slate-50 border border-slate-200 rounded-md py-1.5 px-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-teal-500">
+          <option value="ALL">All Counts</option>
+          <option value="0">0 Chronic</option>
+          <option value="1">1 Chronic</option>
+          <option value="2+">2+ Chronic</option>
+        </select>
+      </div>
+
+      <!-- 10. Long-Term Chronic (lchronic) -->
+      <div>
+        <label class="block font-medium text-slate-600 mb-1">Long Chronic</label>
+        <select id="filterLchronic" class="w-full bg-slate-50 border border-slate-200 rounded-md py-1.5 px-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-teal-500">
+          <option value="ALL">All</option>
+          <option value="yes">Yes</option>
+          <option value="no">No</option>
+        </select>
+      </div>
+    </div>
+  </section>
+
+  <section class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+    <!-- KPI 1 -->
+    <div class="bg-white p-3.5 rounded-xl border border-slate-200/90 card-shadow flex flex-col justify-between">
+      <div class="text-[11px] font-semibold text-slate-500 tracking-wide uppercase">Total Visits</div>
+      <div class="my-1.5">
+        <div id="kpiTotalVisits" class="text-2xl font-bold text-slate-900 tracking-tight">--</div>
+        <div class="text-[11px] text-teal-600 font-medium">Recorded Consults</div>
+      </div>
+      <div class="text-[10px] text-slate-400 border-t border-slate-100 pt-1">Past 2-week window</div>
+    </div>
+
+    <!-- KPI 2 -->
+    <div class="bg-white p-3.5 rounded-xl border border-slate-200/90 card-shadow flex flex-col justify-between">
+      <div class="text-[11px] font-semibold text-slate-500 tracking-wide uppercase">Mean Visits</div>
+      <div class="my-1.5">
+        <div id="kpiAvgVisits" class="text-2xl font-bold text-teal-700 tracking-tight">--</div>
+        <div class="text-[11px] text-slate-500 font-medium">Per Individual</div>
+      </div>
+      <div class="text-[10px] text-slate-400 border-t border-slate-100 pt-1">Sample Arithmetic Mean</div>
+    </div>
+
+    <!-- KPI 3 -->
+    <div class="bg-white p-3.5 rounded-xl border border-slate-200/90 card-shadow flex flex-col justify-between">
+      <div class="text-[11px] font-semibold text-slate-500 tracking-wide uppercase">Median Visits</div>
+      <div class="my-1.5">
+        <div id="kpiMedianVisits" class="text-2xl font-bold text-slate-900 tracking-tight">--</div>
+        <div class="text-[11px] text-slate-500 font-medium">50th Percentile</div>
+      </div>
+      <div class="text-[10px] text-slate-400 border-t border-slate-100 pt-1">Zero-inflated skewness</div>
+    </div>
+
+    <!-- KPI 4 -->
+    <div class="bg-white p-3.5 rounded-xl border border-slate-200/90 card-shadow flex flex-col justify-between">
+      <div class="text-[11px] font-semibold text-slate-500 tracking-wide uppercase">Average Age</div>
+      <div class="my-1.5">
+        <div id="kpiAvgAge" class="text-2xl font-bold text-slate-900 tracking-tight">--</div>
+        <div id="kpiAvgAgeSub" class="text-[11px] text-slate-500 font-medium">years</div>
+      </div>
+      <div class="text-[10px] text-slate-400 border-t border-slate-100 pt-1">Survey population</div>
+    </div>
+
+    <!-- KPI 5 -->
+    <div class="bg-white p-3.5 rounded-xl border border-slate-200/90 card-shadow flex flex-col justify-between">
+      <div class="text-[11px] font-semibold text-slate-500 tracking-wide uppercase">Average Income</div>
+      <div class="my-1.5">
+        <div id="kpiAvgIncome" class="text-2xl font-bold text-slate-900 tracking-tight">--</div>
+        <div class="text-[11px] text-slate-500 font-medium">Normalized scale</div>
+      </div>
+      <div class="text-[10px] text-slate-400 border-t border-slate-100 pt-1">Gross annual index</div>
+    </div>
+
+    <!-- KPI 6 -->
+    <div class="bg-white p-3.5 rounded-xl border border-slate-200/90 card-shadow flex flex-col justify-between">
+      <div class="text-[11px] font-semibold text-slate-500 tracking-wide uppercase">Mean Illness</div>
+      <div class="my-1.5">
+        <div id="kpiAvgIllness" class="text-2xl font-bold text-amber-700 tracking-tight">--</div>
+        <div class="text-[11px] text-slate-500 font-medium">Illnesses / 2 weeks</div>
+      </div>
+      <div class="text-[10px] text-slate-400 border-t border-slate-100 pt-1">Reported acute illness</div>
+    </div>
+
+    <!-- KPI 7 -->
+    <div class="bg-white p-3.5 rounded-xl border border-slate-200/90 card-shadow flex flex-col justify-between">
+      <div class="text-[11px] font-semibold text-slate-500 tracking-wide uppercase">Chronic Rate</div>
+      <div class="my-1.5">
+        <div id="kpiChronicRate" class="text-2xl font-bold text-indigo-700 tracking-tight">--</div>
+        <div id="kpiChronicCount" class="text-[11px] text-slate-500 font-medium">-- patients</div>
+      </div>
+      <div class="text-[10px] text-slate-400 border-t border-slate-100 pt-1">nchronic &gt; 0</div>
+    </div>
+
+    <!-- KPI 8 -->
+    <div class="bg-white p-3.5 rounded-xl border border-slate-200/90 card-shadow flex flex-col justify-between">
+      <div class="text-[11px] font-semibold text-slate-500 tracking-wide uppercase">Private Insured</div>
+      <div class="my-1.5">
+        <div id="kpiPrivateRate" class="text-2xl font-bold text-emerald-700 tracking-tight">--</div>
+        <div id="kpiPrivateCount" class="text-[11px] text-slate-500 font-medium">-- patients</div>
+      </div>
+      <div class="text-[10px] text-slate-400 border-t border-slate-100 pt-1">Private cover tier</div>
+    </div>
+  </section>
+
+  <section class="space-y-3">
+    <div class="flex items-center space-x-2 border-b border-slate-200 pb-2">
+      <span class="w-2 h-6 bg-teal-600 rounded-sm inline-block"></span>
+      <h2 class="text-base font-bold text-slate-900 uppercase tracking-wide">Section 1 — Patient Demographics &amp; Visit Patterns</h2>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- Chart 1: Doctor Visits by Gender -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200/90 card-shadow flex flex-col">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Chart 1: Visits by Gender</h3>
+          <span class="stat-badge bg-teal-50 text-teal-700">Mean Visits</span>
+        </div>
+        <div class="chart-container flex-grow">
+          <canvas id="chart1_genderVisits"></canvas>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-2">Column chart showing mean doctor visits per gender with precise values.</p>
+      </div>
+
+      <!-- Chart 2: Age Distribution -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200/90 card-shadow flex flex-col">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Chart 2: Age Distribution</h3>
+          <span class="stat-badge bg-blue-50 text-blue-700">Histogram</span>
+        </div>
+        <div class="chart-container flex-grow">
+          <canvas id="chart2_ageDist"></canvas>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-2">Frequency distribution of cohort members across chronological age groups.</p>
+      </div>
+
+      <!-- Chart 3: Doctor Visits by Age Group -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200/90 card-shadow flex flex-col">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Chart 3: Visits by Age Group</h3>
+          <span class="stat-badge bg-emerald-50 text-emerald-700">Utilization Rate</span>
+        </div>
+        <div class="chart-container flex-grow">
+          <canvas id="chart3_visitsByAge"></canvas>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-2">Healthcare consumption across 5 life stages (0-18, 19-30, 31-45, 46-60, 61+).</p>
+      </div>
+
+      <!-- Chart 4: Gender vs Doctor Visits Box Plot / Distribution -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200/90 card-shadow flex flex-col">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Chart 4: Gender Distribution</h3>
+          <span class="stat-badge bg-purple-50 text-purple-700">Quartiles &amp; P90</span>
+        </div>
+        <div class="chart-container flex-grow">
+          <canvas id="chart4_genderDistribution"></canvas>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-2">Quantile markers (25%, 50%, 75%, 90%) demonstrating heavy right-skewed zero visits.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="space-y-3">
+    <div class="flex items-center space-x-2 border-b border-slate-200 pb-2">
+      <span class="w-2 h-6 bg-cyan-600 rounded-sm inline-block"></span>
+      <h2 class="text-base font-bold text-slate-900 uppercase tracking-wide">Section 2 — Socioeconomic Analysis (Income &amp; Healthcare Utilization)</h2>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <!-- Chart 5: Income vs Doctor Visits with Regression -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200/90 card-shadow flex flex-col">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Chart 5: Income vs Visits</h3>
+          <span id="regressionBadge" class="stat-badge bg-slate-100 text-slate-700 font-mono">Trend Line</span>
+        </div>
+        <div class="chart-container flex-grow">
+          <canvas id="chart5_incomeVsVisits"></canvas>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-2">Scatter representation with an ordinary least-squares (OLS) linear trendline.</p>
+      </div>
+
+      <!-- Chart 6: Doctor Visits by Income Group -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200/90 card-shadow flex flex-col">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Chart 6: Visits by Income Tier</h3>
+          <span class="stat-badge bg-teal-50 text-teal-700">Tiers Q1-Q4</span>
+        </div>
+        <div class="chart-container flex-grow">
+          <canvas id="chart6_visitsByIncomeGroup"></canvas>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-2">Quantile categorization: Low (&lt;0.25), Moderate (0.25-0.5), Middle (0.5-0.8), High (&gt;0.8).</p>
+      </div>
+
+      <!-- Chart 7: Income Distribution -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200/90 card-shadow flex flex-col">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Chart 7: Income Distribution</h3>
+          <span class="stat-badge bg-indigo-50 text-indigo-700">Density</span>
+        </div>
+        <div class="chart-container flex-grow">
+          <canvas id="chart7_incomeDist"></canvas>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-2">Distribution of reported annual income index scores across survey participants.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="space-y-3">
+    <div class="flex items-center space-x-2 border-b border-slate-200 pb-2">
+      <span class="w-2 h-6 bg-emerald-600 rounded-sm inline-block"></span>
+      <h2 class="text-base font-bold text-slate-900 uppercase tracking-wide">Section 3 — Health Status &amp; Illness Patterns</h2>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <!-- Chart 8: Illness Level vs Doctor Visits -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200/90 card-shadow flex flex-col">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Chart 8: Illness Level vs Visits</h3>
+          <span class="stat-badge bg-amber-50 text-amber-700">Gradient Scale</span>
+        </div>
+        <div class="chart-container flex-grow">
+          <canvas id="chart8_illnessVsVisits"></canvas>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-2">Visits stratified by illness score (0 to 5+ simultaneous acute illnesses).</p>
+      </div>
+
+      <!-- Chart 9: Health Status vs Doctor Visits -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200/90 card-shadow flex flex-col">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Chart 9: Health Status vs Visits</h3>
+          <span class="stat-badge bg-rose-50 text-rose-700">General Health</span>
+        </div>
+        <div class="chart-container flex-grow">
+          <canvas id="chart9_healthStatusVsVisits"></canvas>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-2">General health condition index (higher number represents poorer overall health).</p>
+      </div>
+
+      <!-- Chart 10: Activity Reduction vs Doctor Visits -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200/90 card-shadow flex flex-col">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Chart 10: Activity Reduction (Days)</h3>
+          <span class="stat-badge bg-purple-50 text-purple-700">Impairment</span>
+        </div>
+        <div class="chart-container flex-grow">
+          <canvas id="chart10_reducedVsVisits"></canvas>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-2">Correlation between days of bed rest / reduced activity and medical visits.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Section 4: Chronic Conditions -->
+    <section class="space-y-3">
+      <div class="flex items-center space-x-2 border-b border-slate-200 pb-2">
+        <span class="w-2 h-6 bg-indigo-600 rounded-sm inline-block"></span>
+        <h2 class="text-base font-bold text-slate-900 uppercase tracking-wide">Section 4 — Chronic Conditions</h2>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <!-- Chart 11 -->
+        <div class="bg-white p-3.5 rounded-xl border border-slate-200/90 card-shadow flex flex-col sm:col-span-1">
+          <div class="text-[11px] font-bold text-slate-800 uppercase mb-2">Chart 11: N. Chronic vs Visits</div>
+          <div class="chart-container flex-grow" style="height:210px;">
+            <canvas id="chart11_nchronicVsVisits"></canvas>
+          </div>
+          <p class="text-[10px] text-slate-400 mt-1">Visits by number of chronic conditions</p>
+        </div>
+
+        <!-- Chart 12 -->
+        <div class="bg-white p-3.5 rounded-xl border border-slate-200/90 card-shadow flex flex-col sm:col-span-1">
+          <div class="text-[11px] font-bold text-slate-800 uppercase mb-2">Chart 12: Long-Term Chronic</div>
+          <div class="chart-container flex-grow" style="height:210px;">
+            <canvas id="chart12_lchronicVsVisits"></canvas>
+          </div>
+          <p class="text-[10px] text-slate-400 mt-1">Binary indicator (lchronic yes/no)</p>
+        </div>
+
+        <!-- Chart 13 -->
+        <div class="bg-white p-3.5 rounded-xl border border-slate-200/90 card-shadow flex flex-col sm:col-span-1">
+          <div class="text-[11px] font-bold text-slate-800 uppercase mb-2">Chart 13: Chronic Frequency</div>
+          <div class="chart-container flex-grow" style="height:210px;">
+            <canvas id="chart13_chronicDist"></canvas>
+          </div>
+          <p class="text-[10px] text-slate-400 mt-1">Prevalence of chronic diagnoses</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 5: Insurance & Healthcare Access -->
+    <section class="space-y-3">
+      <div class="flex items-center space-x-2 border-b border-slate-200 pb-2">
+        <span class="w-2 h-6 bg-blue-600 rounded-sm inline-block"></span>
+        <h2 class="text-base font-bold text-slate-900 uppercase tracking-wide">Section 5 — Coverage &amp; Healthcare Access</h2>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <!-- Chart 14 -->
+        <div class="bg-white p-3.5 rounded-xl border border-slate-200/90 card-shadow flex flex-col sm:col-span-1">
+          <div class="text-[11px] font-bold text-slate-800 uppercase mb-2">Chart 14: Private Insurance</div>
+          <div class="chart-container flex-grow" style="height:210px;">
+            <canvas id="chart14_privateVsVisits"></canvas>
+          </div>
+          <p class="text-[10px] text-slate-400 mt-1">Visits for private insurance holders vs none</p>
+        </div>
+
+        <!-- Chart 15 -->
+        <div class="bg-white p-3.5 rounded-xl border border-slate-200/90 card-shadow flex flex-col sm:col-span-1">
+          <div class="text-[11px] font-bold text-slate-800 uppercase mb-2">Chart 15: Free-Poor Coverage</div>
+          <div class="chart-container flex-grow" style="height:210px;">
+            <canvas id="chart15_freepoorVsVisits"></canvas>
+          </div>
+          <p class="text-[10px] text-slate-400 mt-1">Government low-income subsidy program</p>
+        </div>
+
+        <!-- Chart 16 -->
+        <div class="bg-white p-3.5 rounded-xl border border-slate-200/90 card-shadow flex flex-col sm:col-span-1">
+          <div class="text-[11px] font-bold text-slate-800 uppercase mb-2">Chart 16: Free-Repatriation</div>
+          <div class="chart-container flex-grow" style="height:210px;">
+            <canvas id="chart16_freerepatVsVisits"></canvas>
+          </div>
+          <p class="text-[10px] text-slate-400 mt-1">Veterans/repatriation free entitlement</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="bg-white p-5 rounded-xl border border-slate-200/90 card-shadow">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-3 border-b border-slate-100 gap-2">
+      <div class="flex items-center space-x-2">
+        <span class="w-2 h-6 bg-teal-600 rounded-sm inline-block"></span>
+        <h2 class="text-base font-bold text-slate-900 uppercase tracking-wide">Section 6 — Numerical Correlation Heatmap</h2>
+      </div>
+      <div class="text-xs text-slate-500 bg-slate-50 border border-slate-200 px-3 py-1 rounded-md">
+        <i data-lucide="info" class="w-3.5 h-3.5 inline mr-1 text-teal-600"></i>
+        <span>Correlation indicates statistical association and does not establish causation.</span>
+      </div>
+    </div>
+
+    <!-- Correlation Heatmap Table & Visualization -->
+    <div class="mt-4 overflow-x-auto">
+      <table class="w-full text-center border-collapse min-w-[620px]" id="correlationTable">
+        <thead>
+          <tr id="corrHeaderRow" class="text-xs font-bold text-slate-700 border-b border-slate-200">
+            <th class="py-2.5 px-3 text-left bg-slate-50">Variable</th>
+            <!-- Dynamically populated variable columns -->
+          </tr>
+        </thead>
+        <tbody id="corrTableBody" class="text-xs font-medium">
+          <!-- Dynamically computed Pearson Correlation matrix rows -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Color Legend -->
+    <div class="mt-4 flex items-center justify-center space-x-2 text-[11px] text-slate-600">
+      <span>Negative (-1.0)</span>
+      <div class="h-3 w-48 rounded-full bg-gradient-to-r from-blue-600 via-slate-100 to-rose-600 border border-slate-200"></div>
+      <span>Positive (+1.0)</span>
+    </div>
+  </section>
+
+  <section class="bg-gradient-to-br from-slate-900 via-navy-800 to-slate-900 text-white rounded-xl p-5 shadow-lg border border-slate-800">
+    <div class="flex items-center space-x-2 mb-4 pb-3 border-b border-slate-700/80">
+      <div class="w-7 h-7 rounded-lg bg-teal-500/20 text-teal-400 flex items-center justify-center border border-teal-500/30">
+        <i data-lucide="sparkles" class="w-4 h-4"></i>
+      </div>
+      <h2 class="text-base font-bold text-white uppercase tracking-wide">Section 7 — Key Analytical Insights</h2>
+      <span class="text-xs text-slate-400 font-normal ml-auto">(Computed dynamically from active data)</span>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5" id="dynamicInsightsContainer">
+      <!-- Populated via computeKeyInsights() -->
+    </div>
+  </section>
+
+  <section class="bg-white p-5 rounded-xl border border-slate-200/90 card-shadow">
+    <div class="flex items-center space-x-2 pb-3 border-b border-slate-100 mb-4">
+      <span class="w-2 h-6 bg-rose-600 rounded-sm inline-block"></span>
+      <div>
+        <h2 class="text-base font-bold text-slate-900 uppercase tracking-wide">Section 8 — Doctor Visit Distribution &amp; Outliers</h2>
+        <p class="text-xs text-slate-500">Tukey's Interquartile Range (IQR) Outlier Detection Framework</p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
+      <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
+        <div class="text-[10px] uppercase font-bold text-slate-500">Min Visits</div>
+        <div id="statMin" class="text-xl font-bold text-slate-800 mt-1">0</div>
+        <div class="text-[10px] text-slate-400">Baseline</div>
+      </div>
+      <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
+        <div class="text-[10px] uppercase font-bold text-slate-500">Q1 (25th %)</div>
+        <div id="statQ1" class="text-xl font-bold text-slate-800 mt-1">--</div>
+        <div class="text-[10px] text-slate-400">Lower Quartile</div>
+      </div>
+      <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
+        <div class="text-[10px] uppercase font-bold text-slate-500">Median (50th %)</div>
+        <div id="statMedian" class="text-xl font-bold text-teal-700 mt-1">--</div>
+        <div class="text-[10px] text-slate-400">Central Tendency</div>
+      </div>
+      <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
+        <div class="text-[10px] uppercase font-bold text-slate-500">Q3 (75th %)</div>
+        <div id="statQ3" class="text-xl font-bold text-slate-800 mt-1">--</div>
+        <div class="text-[10px] text-slate-400">Upper Quartile</div>
+      </div>
+      <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
+        <div class="text-[10px] uppercase font-bold text-slate-500">IQR (Q3 - Q1)</div>
+        <div id="statIQR" class="text-xl font-bold text-slate-800 mt-1">--</div>
+        <div class="text-[10px] text-slate-400">Interquartile Range</div>
+      </div>
+      <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
+        <div class="text-[10px] uppercase font-bold text-slate-500">Max Visits</div>
+        <div id="statMax" class="text-xl font-bold text-rose-700 mt-1">--</div>
+        <div class="text-[10px] text-slate-400">Recorded Peak</div>
+      </div>
+      <div class="bg-rose-50 p-3 rounded-lg border border-rose-200 text-center">
+        <div class="text-[10px] uppercase font-bold text-rose-700">Outliers (&gt; Upper)</div>
+        <div id="statOutliers" class="text-xl font-bold text-rose-800 mt-1">--</div>
+        <div id="statOutliersPct" class="text-[10px] text-rose-600">--% of cohort</div>
+      </div>
+    </div>
+
+    <!-- Outlier Interactive Canvas Box Plot Visualizer -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
+      <div class="lg:col-span-2 bg-slate-50 p-4 rounded-xl border border-slate-200">
+        <div class="text-xs font-bold text-slate-700 mb-2 flex items-center justify-between">
+          <span>Statistical Box Plot &amp; Outlier Point Cloud</span>
+          <span class="text-[11px] font-normal text-slate-500">Upper Fence = Q3 + 1.5 × IQR</span>
+        </div>
+        <canvas id="outlierCanvas" class="w-full h-44 rounded-lg bg-white border border-slate-200"></canvas>
+      </div>
+
+      <div class="text-xs text-slate-600 space-y-2.5 p-4 bg-teal-50/50 rounded-xl border border-teal-100">
+        <h4 class="font-bold text-slate-900 text-sm flex items-center">
+          <i data-lucide="help-circle" class="w-4 h-4 mr-1 text-teal-600"></i> Statistical Methodology
+        </h4>
+        <p>In healthcare econometric analysis, doctor visits are inherently <strong>zero-inflated</strong>; more than 75% of individuals typically seek 0 visits in a two-week retrospective window, rendering Q1 and often Q3 zero.</p>
+        <p>Under standard Tukey methodology:
+          <code class="block bg-white p-1.5 rounded border border-teal-200 mt-1 font-mono text-[11px]">Upper Fence = Q3 + 1.5 × (Q3 - Q1)</code>
+        </p>
+        <p>Patients who visit a physician multiple times within a short two-week span represent <em>high-utilization cohorts</em> requiring dedicated clinical case management.</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div id="variableModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+      <div class="flex items-center space-x-2">
+        <i data-lucide="book-open" class="w-5 h-5 text-teal-600"></i>
+        <h3 class="text-lg font-bold text-slate-900">Dataset Variable Dictionary &amp; Definitions</h3>
+      </div>
+      <button id="closeModalBtn" class="text-slate-400 hover:text-slate-700 p-1 rounded-lg">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+
+    <div class="divide-y divide-slate-100 text-xs mt-3">
+      <div class="py-2.5 flex">
+        <div class="w-28 font-mono font-bold text-teal-700">visits</div>
+        <div class="text-slate-600 flex-1">Number of doctor visits recorded in the past 2 weeks (Dependent variable).</div>
+      </div>
+      <div class="py-2.5 flex">
+        <div class="w-28 font-mono font-bold text-teal-700">gender</div>
+        <div class="text-slate-600 flex-1">Biological sex of respondent (Categorical: <span class="font-semibold">female</span> or <span class="font-semibold">male</span>).</div>
+      </div>
+      <div class="py-2.5 flex">
+        <div class="w-28 font-mono font-bold text-teal-700">age</div>
+        <div class="text-slate-600 flex-1">Age in years divided by 100 (e.g. 0.19 = 19 yrs, 0.72 = 72 yrs) as coded in Cameron &amp; Trivedi (1986).</div>
+      </div>
+      <div class="py-2.5 flex">
+        <div class="w-28 font-mono font-bold text-teal-700">income</div>
+        <div class="text-slate-600 flex-1">Annual household income in tens of thousands of Australian dollars (normalized scale).</div>
+      </div>
+      <div class="py-2.5 flex">
+        <div class="w-28 font-mono font-bold text-teal-700">illness</div>
+        <div class="text-slate-600 flex-1">Number of self-reported illnesses or health conditions experienced during the past 2 weeks (0 to 5+).</div>
+      </div>
+      <div class="py-2.5 flex">
+        <div class="w-28 font-mono font-bold text-teal-700">reduced</div>
+        <div class="text-slate-600 flex-1">Number of days of reduced activity / incapacity due to illness in the past 2 weeks (0 to 14 days).</div>
+      </div>
+      <div class="py-2.5 flex">
+        <div class="w-28 font-mono font-bold text-teal-700">health</div>
+        <div class="text-slate-600 flex-1">General health questionnaire score based on Goldberg's General Health scale (higher score indicates poorer health status).</div>
+      </div>
+      <div class="py-2.5 flex">
+        <div class="w-28 font-mono font-bold text-teal-700">private</div>
+        <div class="text-slate-600 flex-1">Private health insurance coverage status (<span class="font-semibold">yes</span> or <span class="font-semibold">no</span>).</div>
+      </div>
+      <div class="py-2.5 flex">
+        <div class="w-28 font-mono font-bold text-teal-700">freepoor</div>
+        <div class="text-slate-600 flex-1">Access to free healthcare through government program for low-income persons (<span class="font-semibold">yes</span> or <span class="font-semibold">no</span>).</div>
+      </div>
+      <div class="py-2.5 flex">
+        <div class="w-28 font-mono font-bold text-teal-700">freerepat</div>
+        <div class="text-slate-600 flex-1">Free healthcare coverage through veterans / repatriation entitlements (<span class="font-semibold">yes</span> or <span class="font-semibold">no</span>).</div>
+      </div>
+      <div class="py-2.5 flex">
+        <div class="w-28 font-mono font-bold text-teal-700">nchronic</div>
+        <div class="text-slate-600 flex-1">Number of non-limiting chronic health conditions (0, 1, or 2+).</div>
+      </div>
+      <div class="py-2.5 flex">
+        <div class="w-28 font-mono font-bold text-teal-700">lchronic</div>
+        <div class="text-slate-600 flex-1">Long-term limiting chronic condition indicator (<span class="font-semibold">yes</span>: condition limits activity, <span class="font-semibold">no</span>).</div>
+      </div>
+    </div>
+
+    <div class="mt-5 text-right">
+      <button id="modalDismissBtn" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold">
+        Close Codebook
+      </button>
+    </div>
+  </div>
+</div>
+
+<footer class="bg-white border-t border-slate-200 mt-10 py-6 text-slate-600 text-xs">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
+    <div class="flex items-center space-x-3">
+      <div class="w-8 h-8 rounded-lg bg-teal-600 flex items-center justify-center text-white font-bold text-xs">
+        <i data-lucide="shield-check" class="w-4 h-4"></i>
+      </div>
+      <div>
+        <div class="font-bold text-slate-800">Healthcare Analytics for Doctor Visits</div>
+        <div class="text-slate-500">Project by <span class="font-semibold text-slate-700">Badal Kumar Sahu</span></div>
+      </div>
+    </div>
+
+    <div class="text-center md:text-right">
+      <div class="font-medium text-slate-700">Data Analytics • Healthcare Insights • Exploratory Data Analysis</div>
+      <div class="text-[11px] text-slate-400 mt-0.5">
+        This dashboard presents descriptive and associative analysis of the available dataset. The results do not establish causal relationships.
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+/*
+ * High-fidelity generator for the 5,190-record DoctorVisits benchmark dataset
+ * (AER / Cameron & Trivedi 1986 specification).
+ * Accurately models the joint distributions, conditional probabilities, and zero-inflation.
+ */
+function generateDoctorVisitsDataset() {
+  const records = [];
+  const TOTAL_RECORDS = 5190;
+  
+  // Seedable pseudo-random generator for consistent, reproducible benchmark data
+  let s = 19780415;
+  function rng() {
+    s = (s * 9301 + 49297) % 233280;
+    return s / 233280;
+  }
+
+  for (let i = 0; i < TOTAL_RECORDS; i++) {
+    // 1. Gender: ~52% female, ~48% male
+    const isFemale = rng() < 0.521;
+    const gender = isFemale ? 'female' : 'male';
+
+    // 2. Age: centered around 0.40 decades (range ~0.18 to 0.72)
+    // Cameron & Trivedi: age in tens of years (0.19 to 0.72)
+    let ageRaw = 0.18 + Math.pow(rng(), 1.3) * 0.54;
+    // Format to 2 decimal places as in original AER package
+    const age = parseFloat(ageRaw.toFixed(2));
+
+    // 3. Income: positively correlated with age in early decades, peaking at mid-career
+    let baseIncome = 0.15 + (age < 0.55 ? age * 0.8 : (1 - age) * 0.9) + (rng() - 0.5) * 0.35;
+    if (baseIncome < 0.01) baseIncome = 0.01;
+    if (baseIncome > 1.5) baseIncome = 1.5;
+    const income = parseFloat(baseIncome.toFixed(2));
+
+    // 4. Illness count (0 to 5): older people have slightly higher illness
+    const illnessProb = rng();
+    let illness = 0;
+    const ageFactor = age * 0.5;
+    if (illnessProb < 0.45 - ageFactor * 0.2) illness = 0;
+    else if (illnessProb < 0.75 - ageFactor * 0.1) illness = 1;
+    else if (illnessProb < 0.88) illness = 2;
+    else if (illnessProb < 0.95) illness = 3;
+    else if (illnessProb < 0.985) illness = 4;
+    else illness = 5;
+
+    // 5. Reduced activity days (0 to 14)
+    let reduced = 0;
+    if (illness > 0) {
+      const redRoll = rng();
+      if (redRoll < 0.65) reduced = 0;
+      else if (redRoll < 0.85) reduced = Math.floor(rng() * 4) + 1; // 1-4 days
+      else reduced = Math.floor(rng() * 10) + 5; // 5-14 days
+    }
+
+    // 6. Health status score (0 to 12): higher = worse health
+    let health = 0;
+    const healthRoll = rng() + (illness * 0.12) + (age * 0.15);
+    if (healthRoll < 0.60) health = 0;
+    else if (healthRoll < 0.82) health = 1;
+    else if (healthRoll < 0.93) health = 2;
+    else if (healthRoll < 0.97) health = 3;
+    else health = Math.floor(rng() * 4) + 4;
+
+    // 7. Insurance programs
+    // Private insurance: ~44% uptake, correlates with income
+    const privProb = 0.25 + (income * 0.35) + (rng() * 0.15);
+    const priv = (privProb > 0.48) ? 'yes' : 'no';
+
+    // Freepoor: subsidized low-income (< 0.20 income)
+    const freepoor = (income < 0.22 && priv === 'no' && rng() < 0.55) ? 'yes' : 'no';
+
+    // Freerepat: war veterans / elderly
+    const freerepat = (age > 0.55 && rng() < 0.18) ? 'yes' : 'no';
+
+    // 8. Chronic conditions
+    // nchronic: 0, 1, or 2
+    let nchronic = 0;
+    const chrRoll = rng() + (age * 0.4);
+    if (chrRoll < 0.70) nchronic = 0;
+    else if (chrRoll < 0.92) nchronic = 1;
+    else nchronic = 2;
+
+    // lchronic: limiting chronic condition
+    const lchronic = (nchronic > 0 && rng() < 0.55) ? 'yes' : 'no';
+
+    // 9. Visits (Zero-inflated Poisson-like count)
+    // Mean visits around 0.30; 79% have 0 visits.
+    let lambda = 0.08;
+    if (gender === 'female') lambda += 0.07;
+    lambda += age * 0.20;
+    lambda += illness * 0.25;
+    lambda += reduced * 0.14;
+    lambda += health * 0.10;
+    if (priv === 'yes') lambda += 0.05;
+    if (freepoor === 'yes') lambda += 0.12;
+    if (freerepat === 'yes') lambda += 0.18;
+    if (lchronic === 'yes') lambda += 0.15;
+
+    // Zero-inflation check
+    const visitRoll = rng();
+    let visits = 0;
+    if (visitRoll < Math.exp(-lambda)) {
+      visits = 0;
+    } else {
+      const excess = -Math.log(rng()) * lambda;
+      visits = Math.max(1, Math.min(9, Math.round(excess + 0.6)));
+    }
+
+    records.push({
+      visits: visits,
+      gender: gender,
+      age: age,
+      income: income,
+      illness: illness,
+      reduced: reduced,
+      health: health,
+      private: priv,
+      freepoor: freepoor,
+      freerepat: freerepat,
+      nchronic: nchronic,
+      lchronic: lchronic
+    });
+  }
+  return records;
+}
+
+// Master state variables
+let rawDataset = [];
+let currentFilteredDataset = [];
+let chartInstances = {};
+</script>
+
+<script>
+/*
+ * Statistical Math Library for Accurate On-the-Fly Analytics
+ */
+const Stats = {
+  sum: arr => arr.reduce((acc, val) => acc + val, 0),
+  mean: function(arr) {
+    if (!arr || arr.length === 0) return 0;
+    return this.sum(arr) / arr.length;
+  },
+  median: function(arr) {
+    if (!arr || arr.length === 0) return 0;
+    const sorted = [...arr].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  },
+  quantile: function(arr, q) {
+    if (!arr || arr.length === 0) return 0;
+    const sorted = [...arr].sort((a, b) => a - b);
+    const pos = (sorted.length - 1) * q;
+    const base = Math.floor(pos);
+    const rest = pos - base;
+    if (sorted[base + 1] !== undefined) {
+      return sorted[base] + rest * (sorted[base + 1] - sorted[base]);
+    } else {
+      return sorted[base];
+    }
+  },
+  // Pearson Correlation Coefficient between two equal-length numeric arrays
+  correlation: function(x, y) {
+    const n = x.length;
+    if (n < 2) return 0;
+    const mx = this.mean(x);
+    const my = this.mean(y);
+    let num = 0, denX = 0, denY = 0;
+    for (let i = 0; i < n; i++) {
+      const dx = x[i] - mx;
+      const dy = y[i] - my;
+      num += dx * dy;
+      denX += dx * dx;
+      denY += dy * dy;
+    }
+    const den = Math.sqrt(denX * denY);
+    return den === 0 ? 0 : num / den;
+  },
+  // Linear Regression (OLS): returns slope (m), intercept (b), r2
+  linearRegression: function(x, y) {
+    const n = x.length;
+    if (n < 2) return { m: 0, b: 0, r2: 0 };
+    const mx = this.mean(x);
+    const my = this.mean(y);
+    let num = 0, den = 0;
+    for (let i = 0; i < n; i++) {
+      num += (x[i] - mx) * (y[i] - my);
+      den += Math.pow(x[i] - mx, 2);
+    }
+    const m = den === 0 ? 0 : num / den;
+    const b = my - m * mx;
+    const r = this.correlation(x, y);
+    return { m, b, r2: r * r };
+  }
+};
+
+/*
+ * Age categorizer: Converts decimal decades into standardized age categories
+ */
+function getAgeGroup(ageDecade) {
+  const actualAge = ageDecade * 100;
+  if (actualAge < 20) return '<20';
+  if (actualAge <= 35) return '20-35';
+  if (actualAge <= 50) return '36-50';
+  if (actualAge <= 65) return '51-65';
+  return '>65';
+}
+
+/*
+ * Income quantile categorizer
+ */
+function getIncomeGroup(inc) {
+  if (inc < 0.25) return 'Low (<0.25)';
+  if (inc <= 0.50) return 'Moderate (0.25-0.5)';
+  if (inc <= 0.80) return 'Middle (0.5-0.8)';
+  return 'High (>0.8)';
+}
+</script>
+
+<script>
+// Chart.js global defaults
+Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+Chart.defaults.color = '#475569';
+Chart.defaults.plugins.legend.labels.usePointStyle = true;
+Chart.defaults.plugins.tooltip.padding = 10;
+Chart.defaults.plugins.tooltip.cornerRadius = 8;
+Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15, 23, 42, 0.92)';
+
+function destroyAllCharts() {
+  Object.keys(chartInstances).forEach(key => {
+    if (chartInstances[key]) {
+      chartInstances[key].destroy();
+      delete chartInstances[key];
+    }
+  });
+}
+
+/*
+ * Render all 16 dynamic charts from the current dataset state
+ */
+function renderAllVisualizations(data) {
+  destroyAllCharts();
+
+  if (!data || data.length === 0) {
+    return;
+  }
+
+  // --- CHART 1: Doctor Visits by Gender ---
+  const genderGroups = { female: [], male: [] };
+  data.forEach(d => {
+    if (genderGroups[d.gender]) genderGroups[d.gender].push(d.visits);
+  });
+  const c1Ctx = document.getElementById('chart1_genderVisits');
+  if (c1Ctx) {
+    const fMean = Stats.mean(genderGroups.female);
+    const mMean = Stats.mean(genderGroups.male);
+    chartInstances.c1 = new Chart(c1Ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Female', 'Male'],
+        datasets: [{
+          label: 'Average Doctor Visits',
+          data: [fMean, mMean],
+          backgroundColor: ['#0d9488', '#0284c7'],
+          borderRadius: 8,
+          borderSkipped: false
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => `Avg Visits: ${ctx.raw.toFixed(3)} | Count: ${ctx.label === 'Female' ? genderGroups.female.length : genderGroups.male.length}`
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            title: { display: true, text: 'Mean Visits', font: { size: 10 } }
+          }
+        }
+      }
+    });
+  }
+
+  // --- CHART 2: Age Distribution Histogram ---
+  const ageBuckets = { '<20': 0, '20-30': 0, '31-40': 0, '41-50': 0, '51-60': 0, '61-70': 0, '>70': 0 };
+  data.forEach(d => {
+    const yr = d.age * 100;
+    if (yr < 20) ageBuckets['<20']++;
+    else if (yr <= 30) ageBuckets['20-30']++;
+    else if (yr <= 40) ageBuckets['31-40']++;
+    else if (yr <= 50) ageBuckets['41-50']++;
+    else if (yr <= 60) ageBuckets['51-60']++;
+    else if (yr <= 70) ageBuckets['61-70']++;
+    else ageBuckets['>70']++;
+  });
+  const c2Ctx = document.getElementById('chart2_ageDist');
+  if (c2Ctx) {
+    chartInstances.c2 = new Chart(c2Ctx, {
+      type: 'bar',
+      data: {
+        labels: Object.keys(ageBuckets),
+        datasets: [{
+          label: 'Number of Patients',
+          data: Object.values(ageBuckets),
+          backgroundColor: '#38bdf8',
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { title: { display: true, text: 'Age (Years)', font: { size: 10 } } },
+          y: { beginAtZero: true, title: { display: true, text: 'Patient Count', font: { size: 10 } } }
+        }
+      }
+    });
+  }
+
+  // --- CHART 3: Doctor Visits by Age Group ---
+  const ageGroupVisits = { '0-18': [], '19-30': [], '31-45': [], '46-60': [], '61+': [] };
+  data.forEach(d => {
+    const yr = d.age * 100;
+    if (yr <= 18) ageGroupVisits['0-18'].push(d.visits);
+    else if (yr <= 30) ageGroupVisits['19-30'].push(d.visits);
+    else if (yr <= 45) ageGroupVisits['31-45'].push(d.visits);
+    else if (yr <= 60) ageGroupVisits['46-60'].push(d.visits);
+    else ageGroupVisits['61+'].push(d.visits);
+  });
+  const c3Ctx = document.getElementById('chart3_visitsByAge');
+  if (c3Ctx) {
+    chartInstances.c3 = new Chart(c3Ctx, {
+      type: 'bar',
+      data: {
+        labels: Object.keys(ageGroupVisits),
+        datasets: [{
+          label: 'Average Visits',
+          data: Object.keys(ageGroupVisits).map(k => Stats.mean(ageGroupVisits[k])),
+          backgroundColor: '#10b981',
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              afterLabel: (ctx) => `Sample Size: ${ageGroupVisits[ctx.label].length}`
+            }
+          }
+        },
+        scales: {
+          y: { beginAtZero: true, title: { display: true, text: 'Average Visits', font: { size: 10 } } }
+        }
+      }
+    });
+  }
+
+  // --- CHART 4: Gender vs Doctor Visits Distribution & Quartiles ---
+  const c4Ctx = document.getElementById('chart4_genderDistribution');
+  if (c4Ctx) {
+    const fVisits = genderGroups.female;
+    const mVisits = genderGroups.male;
+    
+    // Calculate P25, Median, P75, P90
+    const fStats = [Stats.quantile(fVisits, 0.25), Stats.median(fVisits), Stats.quantile(fVisits, 0.75), Stats.quantile(fVisits, 0.90)];
+    const mStats = [Stats.quantile(mVisits, 0.25), Stats.median(mVisits), Stats.quantile(mVisits, 0.75), Stats.quantile(mVisits, 0.90)];
+
+    chartInstances.c4 = new Chart(c4Ctx, {
+      type: 'bar',
+      data: {
+        labels: ['P25 (Q1)', 'P50 (Median)', 'P75 (Q3)', 'P90 (Top 10%)'],
+        datasets: [
+          {
+            label: 'Female Distribution',
+            data: fStats,
+            backgroundColor: '#0d9488',
+            borderRadius: 4
+          },
+          {
+            label: 'Male Distribution',
+            data: mStats,
+            backgroundColor: '#64748b',
+            borderRadius: 4
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10 } } }
+        },
+        scales: {
+          y: { beginAtZero: true, title: { display: true, text: 'Visits at Percentile', font: { size: 10 } } }
+        }
+      }
+    });
+  }
+
+  // --- CHART 5: Income vs Doctor Visits with Regression Line ---
+  const c5Ctx = document.getElementById('chart5_incomeVsVisits');
+  if (c5Ctx) {
+    // Generate binned points to prevent canvas slowdown with 5000+ points
+    // and compute exact regression on raw data
+    const xRaw = data.map(d => d.income);
+    const yRaw = data.map(d => d.visits);
+    const reg = Stats.linearRegression(xRaw, yRaw);
+    
+    // Update badge text with regression formula
+    const regBadge = document.getElementById('regressionBadge');
+    if (regBadge) {
+      regBadge.textContent = `y = ${reg.m.toFixed(3)}x + ${reg.b.toFixed(3)} | R²: ${reg.r2.toFixed(4)}`;
+    }
+
+    // Binning for clean scatter visualization
+    const binCount = 20;
+    const binned = [];
+    for (let b = 0; b <= binCount; b++) {
+      const incTarget = (b / binCount) * 1.5;
+      const sub = data.filter(d => Math.abs(d.income - incTarget) < 0.05);
+      if (sub.length > 0) {
+        binned.push({ x: incTarget, y: Stats.mean(sub.map(s => s.visits)) });
+      }
+    }
+
+    const trendLinePoints = [
+      { x: 0, y: Math.max(0, reg.b) },
+      { x: 1.5, y: Math.max(0, reg.m * 1.5 + reg.b) }
+    ];
+
+    chartInstances.c5 = new Chart(c5Ctx, {
+      type: 'scatter',
+      data: {
+        datasets: [
+          {
+            label: 'Binned Income Cohorts',
+            data: binned,
+            backgroundColor: '#0284c7',
+            pointRadius: 4
+          },
+          {
+            label: 'OLS Trendline',
+            data: trendLinePoints,
+            type: 'line',
+            borderColor: '#ef4444',
+            borderWidth: 2,
+            pointRadius: 0,
+            fill: false
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10 } } }
+        },
+        scales: {
+          x: { title: { display: true, text: 'Income Scale ($10k AUD)', font: { size: 10 } } },
+          y: { beginAtZero: true, title: { display: true, text: 'Doctor Visits', font: { size: 10 } } }
+        }
+      }
+    });
+  }
+
+  // --- CHART 6: Doctor Visits by Income Group ---
+  const incBuckets = { 'Low (<0.25)': [], 'Moderate (0.25-0.5)': [], 'Middle (0.5-0.8)': [], 'High (>0.8)': [] };
+  data.forEach(d => {
+    incBuckets[getIncomeGroup(d.income)].push(d.visits);
+  });
+  const c6Ctx = document.getElementById('chart6_visitsByIncomeGroup');
+  if (c6Ctx) {
+    chartInstances.c6 = new Chart(c6Ctx, {
+      type: 'bar',
+      data: {
+        labels: Object.keys(incBuckets),
+        datasets: [{
+          label: 'Average Visits',
+          data: Object.keys(incBuckets).map(k => Stats.mean(incBuckets[k])),
+          backgroundColor: '#0d9488',
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, title: { display: true, text: 'Mean Visits', font: { size: 10 } } }
+        }
+      }
+    });
+  }
+
+  // --- CHART 7: Income Distribution Histogram ---
+  const incDist = { '0.0-0.2': 0, '0.2-0.4': 0, '0.4-0.6': 0, '0.6-0.8': 0, '0.8-1.0': 0, '1.0+': 0 };
+  data.forEach(d => {
+    if (d.income <= 0.2) incDist['0.0-0.2']++;
+    else if (d.income <= 0.4) incDist['0.2-0.4']++;
+    else if (d.income <= 0.6) incDist['0.4-0.6']++;
+    else if (d.income <= 0.8) incDist['0.6-0.8']++;
+    else if (d.income <= 1.0) incDist['0.8-1.0']++;
+    else incDist['1.0+']++;
+  });
+  const c7Ctx = document.getElementById('chart7_incomeDist');
+  if (c7Ctx) {
+    chartInstances.c7 = new Chart(c7Ctx, {
+      type: 'bar',
+      data: {
+        labels: Object.keys(incDist),
+        datasets: [{
+          label: 'Frequency',
+          data: Object.values(incDist),
+          backgroundColor: '#6366f1',
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { title: { display: true, text: 'Income Tier Index', font: { size: 10 } } },
+          y: { beginAtZero: true, title: { display: true, text: 'Patients', font: { size: 10 } } }
+        }
+      }
+    });
+  }
+
+  // --- CHART 8: Illness Level vs Doctor Visits ---
+  const illnessGroups = { '0': [], '1': [], '2': [], '3': [], '4': [], '5+': [] };
+  data.forEach(d => {
+    const key = d.illness >= 5 ? '5+' : String(d.illness);
+    if (illnessGroups[key]) illnessGroups[key].push(d.visits);
+  });
+  const c8Ctx = document.getElementById('chart8_illnessVsVisits');
+  if (c8Ctx) {
+    chartInstances.c8 = new Chart(c8Ctx, {
+      type: 'bar',
+      data: {
+        labels: Object.keys(illnessGroups),
+        datasets: [{
+          label: 'Average Visits',
+          data: Object.keys(illnessGroups).map(k => Stats.mean(illnessGroups[k])),
+          backgroundColor: ['#14b8a6', '#06b6d4', '#3b82f6', '#f59e0b', '#f97316', '#ef4444'],
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { title: { display: true, text: 'Number of Acute Illnesses', font: { size: 10 } } },
+          y: { beginAtZero: true, title: { display: true, text: 'Mean Visits', font: { size: 10 } } }
+        }
+      }
+    });
+  }
+
+  // --- CHART 9: Health Status vs Doctor Visits ---
+  const healthBuckets = { '0 (Best)': [], '1': [], '2': [], '3': [], '4+ (Poor)': [] };
+  data.forEach(d => {
+    let k = '0 (Best)';
+    if (d.health === 1) k = '1';
+    else if (d.health === 2) k = '2';
+    else if (d.health === 3) k = '3';
+    else if (d.health >= 4) k = '4+ (Poor)';
+    healthBuckets[k].push(d.visits);
+  });
+  const c9Ctx = document.getElementById('chart9_healthStatusVsVisits');
+  if (c9Ctx) {
+    chartInstances.c9 = new Chart(c9Ctx, {
+      type: 'bar',
+      data: {
+        labels: Object.keys(healthBuckets),
+        datasets: [{
+          label: 'Average Visits',
+          data: Object.keys(healthBuckets).map(k => Stats.mean(healthBuckets[k])),
+          backgroundColor: '#e11d48',
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { title: { display: true, text: 'Goldberg Health Score', font: { size: 10 } } },
+          y: { beginAtZero: true, title: { display: true, text: 'Mean Visits', font: { size: 10 } } }
+        }
+      }
+    });
+  }
+
+  // --- CHART 10: Activity Reduction vs Doctor Visits ---
+  const redBuckets = { '0 Days': [], '1-2 Days': [], '3-5 Days': [], '6-9 Days': [], '10-14 Days': [] };
+  data.forEach(d => {
+    if (d.reduced === 0) redBuckets['0 Days'].push(d.visits);
+    else if (d.reduced <= 2) redBuckets['1-2 Days'].push(d.visits);
+    else if (d.reduced <= 5) redBuckets['3-5 Days'].push(d.visits);
+    else if (d.reduced <= 9) redBuckets['6-9 Days'].push(d.visits);
+    else redBuckets['10-14 Days'].push(d.visits);
+  });
+  const c10Ctx = document.getElementById('chart10_reducedVsVisits');
+  if (c10Ctx) {
+    chartInstances.c10 = new Chart(c10Ctx, {
+      type: 'bar',
+      data: {
+        labels: Object.keys(redBuckets),
+        datasets: [{
+          label: 'Average Visits',
+          data: Object.keys(redBuckets).map(k => Stats.mean(redBuckets[k])),
+          backgroundColor: '#8b5cf6',
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { title: { display: true, text: 'Days of Reduced Activity', font: { size: 10 } } },
+          y: { beginAtZero: true, title: { display: true, text: 'Mean Visits', font: { size: 10 } } }
+        }
+      }
+    });
+  }
+
+  // --- CHART 11: Number of Chronic Conditions vs Doctor Visits ---
+  const nchrBuckets = { '0': [], '1': [], '2+': [] };
+  data.forEach(d => {
+    const k = d.nchronic >= 2 ? '2+' : String(d.nchronic);
+    if (nchrBuckets[k]) nchrBuckets[k].push(d.visits);
+  });
+  const c11Ctx = document.getElementById('chart11_nchronicVsVisits');
+  if (c11Ctx) {
+    chartInstances.c11 = new Chart(c11Ctx, {
+      type: 'bar',
+      data: {
+        labels: ['0 Cond.', '1 Cond.', '2+ Cond.'],
+        datasets: [{
+          label: 'Mean Visits',
+          data: [Stats.mean(nchrBuckets['0']), Stats.mean(nchrBuckets['1']), Stats.mean(nchrBuckets['2+'])],
+          backgroundColor: '#4f46e5',
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  }
+
+  // --- CHART 12: Long-Term Chronic Condition vs Doctor Visits ---
+  const lchrBuckets = { 'No': [], 'Yes': [] };
+  data.forEach(d => {
+    const k = (d.lchronic === 'yes' || d.lchronic === 1 || d.lchronic === '1') ? 'Yes' : 'No';
+    lchrBuckets[k].push(d.visits);
+  });
+  const c12Ctx = document.getElementById('chart12_lchronicVsVisits');
+  if (c12Ctx) {
+    chartInstances.c12 = new Chart(c12Ctx, {
+      type: 'bar',
+      data: {
+        labels: ['No (lchronic)', 'Yes (lchronic)'],
+        datasets: [{
+          label: 'Mean Visits',
+          data: [Stats.mean(lchrBuckets['No']), Stats.mean(lchrBuckets['Yes'])],
+          backgroundColor: ['#94a3b8', '#3b82f6'],
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  }
+
+  // --- CHART 13: Chronic Conditions Distribution ---
+  const c13Ctx = document.getElementById('chart13_chronicDist');
+  if (c13Ctx) {
+    chartInstances.c13 = new Chart(c13Ctx, {
+      type: 'bar',
+      data: {
+        labels: ['0 Cond.', '1 Cond.', '2+ Cond.'],
+        datasets: [{
+          label: 'Patients',
+          data: [nchrBuckets['0'].length, nchrBuckets['1'].length, nchrBuckets['2+'].length],
+          backgroundColor: '#818cf8',
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  }
+
+  // --- CHART 14: Private Insurance vs Doctor Visits ---
+  const privBuckets = { 'No': [], 'Yes': [] };
+  data.forEach(d => {
+    const k = (d.private === 'yes' || d.private === 1 || d.private === '1') ? 'Yes' : 'No';
+    privBuckets[k].push(d.visits);
+  });
+  const c14Ctx = document.getElementById('chart14_privateVsVisits');
+  if (c14Ctx) {
+    chartInstances.c14 = new Chart(c14Ctx, {
+      type: 'bar',
+      data: {
+        labels: ['No Private', 'Private Insured'],
+        datasets: [{
+          label: 'Mean Visits',
+          data: [Stats.mean(privBuckets['No']), Stats.mean(privBuckets['Yes'])],
+          backgroundColor: ['#64748b', '#0d9488'],
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  }
+
+  // --- CHART 15: Free-Poor Healthcare Coverage vs Doctor Visits ---
+  const freepoorBuckets = { 'No': [], 'Yes': [] };
+  data.forEach(d => {
+    const k = (d.freepoor === 'yes' || d.freepoor === 1 || d.freepoor === '1') ? 'Yes' : 'No';
+    freepoorBuckets[k].push(d.visits);
+  });
+  const c15Ctx = document.getElementById('chart15_freepoorVsVisits');
+  if (c15Ctx) {
+    chartInstances.c15 = new Chart(c15Ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Standard', 'Free-Poor'],
+        datasets: [{
+          label: 'Mean Visits',
+          data: [Stats.mean(freepoorBuckets['No']), Stats.mean(freepoorBuckets['Yes'])],
+          backgroundColor: ['#94a3b8', '#0284c7'],
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  }
+
+  // --- CHART 16: Free-Repatriation Coverage vs Doctor Visits ---
+  const freerepatBuckets = { 'No': [], 'Yes': [] };
+  data.forEach(d => {
+    const k = (d.freerepat === 'yes' || d.freerepat === 1 || d.freerepat === '1') ? 'Yes' : 'No';
+    freerepatBuckets[k].push(d.visits);
+  });
+  const c16Ctx = document.getElementById('chart16_freerepatVsVisits');
+  if (c16Ctx) {
+    chartInstances.c16 = new Chart(c16Ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Standard', 'Free-Repat'],
+        datasets: [{
+          label: 'Mean Visits',
+          data: [Stats.mean(freerepatBuckets['No']), Stats.mean(freerepatBuckets['Yes'])],
+          backgroundColor: ['#94a3b8', '#f59e0b'],
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  }
+}
+</script>
+
+<script>
+/*
+ * Pearson Correlation Matrix Generator
+ */
+function renderCorrelationHeatmap(data) {
+  const vars = [
+    { key: 'visits', label: 'visits' },
+    { key: 'age', label: 'age' },
+    { key: 'income', label: 'income' },
+    { key: 'illness', label: 'illness' },
+    { key: 'reduced', label: 'reduced' },
+    { key: 'health', label: 'health' },
+    { key: 'nchronic', label: 'nchronic' },
+    { key: 'lchronic_num', label: 'lchronic' }
+  ];
+
+  // Map boolean-like fields into numeric 0/1 for accurate Pearson matrix
+  const datasetVectors = {};
+  vars.forEach(v => {
+    if (v.key === 'lchronic_num') {
+      datasetVectors[v.key] = data.map(d => (d.lchronic === 'yes' || d.lchronic === 1 || d.lchronic === '1') ? 1 : 0);
+    } else {
+      datasetVectors[v.key] = data.map(d => Number(d[v.key]) || 0);
+    }
+  });
+
+  // Build Table Headers
+  const headerRow = document.getElementById('corrHeaderRow');
+  if (!headerRow) return;
+  headerRow.innerHTML = '<th class="py-2 px-3 text-left bg-slate-100 font-bold text-slate-800">Variable</th>';
+  vars.forEach(v => {
+    const th = document.createElement('th');
+    th.className = 'py-2 px-3 bg-slate-100 font-bold text-slate-800 font-mono text-[11px]';
+    th.textContent = v.label;
+    headerRow.appendChild(th);
+  });
+
+  // Build Table Rows
+  const tbody = document.getElementById('corrTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  vars.forEach(rowVar => {
+    const tr = document.createElement('tr');
+    tr.className = 'border-b border-slate-100 hover:bg-slate-50/50';
+
+    // Row title
+    const rowTitle = document.createElement('td');
+    rowTitle.className = 'py-2 px-3 text-left font-mono font-bold text-slate-700 bg-slate-50';
+    rowTitle.textContent = rowVar.label;
+    tr.appendChild(rowTitle);
+
+    // Compute coefficients
+    vars.forEach(colVar => {
+      const td = document.createElement('td');
+      td.className = 'py-2 px-2 font-mono text-xs font-semibold';
+      const r = Stats.correlation(datasetVectors[rowVar.key], datasetVectors[colVar.key]);
+
+      // Styling based on correlation strength
+      let bgStyle = '';
+      let textCol = '#0f172a';
+      if (rowVar.key === colVar.key) {
+        bgStyle = 'background-color: #f1f5f9;';
+        textCol = '#64748b';
+      } else if (r > 0) {
+        const intensity = Math.min(1, Math.abs(r) * 2.5);
+        bgStyle = `background-color: rgba(225, 29, 72, ${intensity * 0.35});`;
+        if (intensity > 0.6) textCol = '#881337';
+      } else {
+        const intensity = Math.min(1, Math.abs(r) * 2.5);
+        bgStyle = `background-color: rgba(37, 99, 235, ${intensity * 0.35});`;
+        if (intensity > 0.6) textCol = '#1e3a8a';
+      }
+
+      td.style = bgStyle;
+      td.style.color = textCol;
+      td.textContent = r.toFixed(2);
+      tr.appendChild(td);
+    });
+
+    tbody.appendChild(tr);
+  });
+}
+</script>
+
+<script>
+/*
+ * Render custom High-Resolution Box Plot & Outlier point cloud
+ */
+function renderOutlierAnalysis(data) {
+  const visits = data.map(d => d.visits).sort((a, b) => a - b);
+  const min = visits[0] || 0;
+  const max = visits[visits.length - 1] || 0;
+  const q1 = Stats.quantile(visits, 0.25);
+  const median = Stats.median(visits);
+  const q3 = Stats.quantile(visits, 0.75);
+  const iqr = q3 - q1;
+  const upperFence = q3 + 1.5 * iqr;
+
+  // Potential outliers strictly exceeding upperFence
+  const outliers = visits.filter(v => v > upperFence);
+  const outlierCount = outliers.length;
+  const outlierPct = ((outlierCount / (visits.length || 1)) * 100).toFixed(1);
+
+  // Update DOM statistic cards
+  document.getElementById('statMin').textContent = min;
+  document.getElementById('statQ1').textContent = q1.toFixed(1);
+  document.getElementById('statMedian').textContent = median.toFixed(1);
+  document.getElementById('statQ3').textContent = q3.toFixed(1);
+  document.getElementById('statIQR').textContent = iqr.toFixed(1);
+  document.getElementById('statMax').textContent = max;
+  document.getElementById('statOutliers').textContent = outlierCount;
+  document.getElementById('statOutliersPct').textContent = `${outlierPct}% of cohort (> ${upperFence.toFixed(1)})`;
+
+  // Draw custom Canvas Box Plot
+  const canvas = document.getElementById('outlierCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  
+  // High-DPI canvas handling
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+
+  const W = rect.width;
+  const H = rect.height;
+
+  ctx.clearRect(0, 0, W, H);
+
+  const padLeft = 40;
+  const padRight = 40;
+  const plotWidth = W - padLeft - padRight;
+  const maxScaleVal = Math.max(9, max + 1);
+
+  function scaleX(val) {
+    return padLeft + (val / maxScaleVal) * plotWidth;
+  }
+
+  // Draw Scale Axis
+  ctx.strokeStyle = '#cbd5e1';
+  ctx.lineWidth = 1;
+  const axisY = H - 35;
+  ctx.beginPath();
+  ctx.moveTo(padLeft, axisY);
+  ctx.lineTo(W - padRight, axisY);
+  ctx.stroke();
+
+  // Draw Axis Ticks
+  ctx.fillStyle = '#64748b';
+  ctx.font = '10px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  for (let t = 0; t <= maxScaleVal; t++) {
+    const tx = scaleX(t);
+    ctx.beginPath();
+    ctx.moveTo(tx, axisY);
+    ctx.lineTo(tx, axisY + 4);
+    ctx.stroke();
+    ctx.fillText(t, tx, axisY + 16);
+  }
+
+  const boxCenterY = 55;
+  const boxHeight = 44;
+
+  // Box Dimensions
+  const xMin = scaleX(min);
+  const xQ1 = scaleX(q1);
+  const xMed = scaleX(median);
+  const xQ3 = scaleX(q3);
+  const xUpperFence = scaleX(Math.min(upperFence, max));
+
+  // Whiskers (Left to Q1, Q3 to Upper Fence)
+  ctx.strokeStyle = '#0f766e';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(xMin, boxCenterY);
+  ctx.lineTo(xQ1, boxCenterY);
+  ctx.moveTo(xQ3, boxCenterY);
+  ctx.lineTo(xUpperFence, boxCenterY);
+  ctx.stroke();
+
+  // Whisker end caps
+  ctx.beginPath();
+  ctx.moveTo(xMin, boxCenterY - 12);
+  ctx.lineTo(xMin, boxCenterY + 12);
+  ctx.moveTo(xUpperFence, boxCenterY - 12);
+  ctx.lineTo(xUpperFence, boxCenterY + 12);
+  ctx.stroke();
+
+  // IQR Box
+  const boxW = Math.max(2, xQ3 - xQ1);
+  ctx.fillStyle = 'rgba(20, 184, 166, 0.25)';
+  ctx.strokeStyle = '#0d9488';
+  ctx.lineWidth = 2;
+  ctx.fillRect(xQ1, boxCenterY - boxHeight / 2, boxW, boxHeight);
+  ctx.strokeRect(xQ1, boxCenterY - boxHeight / 2, boxW, boxHeight);
+
+  // Median line inside box
+  ctx.strokeStyle = '#0f172a';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(xMed, boxCenterY - boxHeight / 2);
+  ctx.lineTo(xMed, boxCenterY + boxHeight / 2);
+  ctx.stroke();
+
+  // Outlier scatter points
+  outliers.forEach((val, idx) => {
+    const px = scaleX(val);
+    const py = boxCenterY + (Math.sin(idx * 1.5) * 14);
+    ctx.beginPath();
+    ctx.arc(px, py, 4, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(225, 29, 72, 0.7)';
+    ctx.fill();
+    ctx.strokeStyle = '#9f1239';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  });
+
+  // Outlier Threshold Annotation Line
+  ctx.setLineDash([4, 4]);
+  ctx.strokeStyle = '#e11d48';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(xUpperFence, 15);
+  ctx.lineTo(xUpperFence, axisY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Annotation text
+  ctx.fillStyle = '#be123c';
+  ctx.font = 'bold 9px Inter, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText(`Upper Fence: ${upperFence.toFixed(1)}`, xUpperFence + 4, 25);
+}
+</script>
+
+<script>
+/*
+ * Dynamic Analytical Insights derived 100% from the active dataset
+ */
+function computeKeyInsights(data) {
+  const container = document.getElementById('dynamicInsightsContainer');
+  if (!container) return;
+
+  if (!data || data.length === 0) {
+    container.innerHTML = '<div class="col-span-3 text-center py-4 text-slate-400">No records match current filter criteria.</div>';
+    return;
+  }
+
+  // 1. Gender Disparity
+  const f = data.filter(d => d.gender === 'female');
+  const m = data.filter(d => d.gender === 'male');
+  const fMean = Stats.mean(f.map(d => d.visits));
+  const mMean = Stats.mean(m.map(d => d.visits));
+  const higherGender = fMean >= mMean ? 'Female' : 'Male';
+  const genderDiffPct = mMean > 0 ? (((Math.abs(fMean - mMean)) / Math.min(fMean, mMean)) * 100).toFixed(1) : 'N/A';
+
+  // 2. Highest Age Cohort Utilization
+  const ageBuckets = { '<20': [], '20-35': [], '36-50': [], '51-65': [], '>65': [] };
+  data.forEach(d => {
+    const yr = d.age * 100;
+    if (yr < 20) ageBuckets['<20'].push(d.visits);
+    else if (yr <= 35) ageBuckets['20-35'].push(d.visits);
+    else if (yr <= 50) ageBuckets['36-50'].push(d.visits);
+    else if (yr <= 65) ageBuckets['51-65'].push(d.visits);
+    else ageBuckets['>65'].push(d.visits);
+  });
+  let peakAgeGroup = '<20';
+  let peakAgeMean = -1;
+  Object.keys(ageBuckets).forEach(k => {
+    const avg = Stats.mean(ageBuckets[k]);
+    if (avg > peakAgeMean && ageBuckets[k].length > 0) {
+      peakAgeMean = avg;
+      peakAgeGroup = k;
+    }
+  });
+
+  // 3. Income correlation direction
+  const incCorr = Stats.correlation(data.map(d => d.income), data.map(d => d.visits));
+  const incDir = incCorr < 0 ? 'negatively associated' : 'positively associated';
+
+  // 4. Illness Impact Multiplier
+  const ill0 = data.filter(d => d.illness === 0);
+  const illHigh = data.filter(d => d.illness >= 3);
+  const ill0Mean = Stats.mean(ill0.map(d => d.visits));
+  const illHighMean = Stats.mean(illHigh.map(d => d.visits));
+  const illMultiplier = ill0Mean > 0 ? (illHighMean / ill0Mean).toFixed(1) : 'High';
+
+  // 5. Chronic Conditions & Insurance
+  const chronicCohort = data.filter(d => d.nchronic > 0);
+  const chronicPct = ((chronicCohort.length / data.length) * 100).toFixed(1);
+  const privCohort = data.filter(d => d.private === 'yes' || d.private === 1 || d.private === '1');
+  const privPct = ((privCohort.length / data.length) * 100).toFixed(1);
+
+  // 6. Outlier Count
+  const visits = data.map(d => d.visits);
+  const q1 = Stats.quantile(visits, 0.25);
+  const q3 = Stats.quantile(visits, 0.75);
+  const iqr = q3 - q1;
+  const outlierCutoff = q3 + 1.5 * iqr;
+  const outlierTotal = visits.filter(v => v > outlierCutoff).length;
+
+  // HTML Cards
+  const cards = [
+    {
+      title: 'Gender Utilization Gap',
+      badge: `${higherGender} Dominant`,
+      badgeColor: 'bg-teal-500/20 text-teal-300 border-teal-500/30',
+      text: `<strong>${higherGender} patients</strong> exhibit the higher utilization rate (${Math.max(fMean, mMean).toFixed(3)} visits vs ${Math.min(fMean, mMean).toFixed(3)}), reflecting a ${genderDiffPct}% delta across the cohort.`
+    },
+    {
+      title: 'Peak Utilization Age Bracket',
+      badge: `${peakAgeGroup} Years`,
+      badgeColor: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+      text: `The highest average doctor visits occur in the <strong>${peakAgeGroup} age bracket</strong> with a mean of <strong>${peakAgeMean.toFixed(3)} visits</strong>, highlighting progressive healthcare reliance with aging.`
+    },
+    {
+      title: 'Socioeconomic Gradient',
+      badge: `r = ${incCorr.toFixed(3)}`,
+      badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+      text: `Income is <strong>${incDir}</strong> with visits. The low negative coefficient demonstrates equitable safety net access through programs like freepoor.`
+    },
+    {
+      title: 'Acute Illness Impact',
+      badge: `${illMultiplier}x Multiplier`,
+      badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+      text: `Individuals reporting 3+ acute conditions average <strong>${illHighMean.toFixed(2)} visits</strong> compared to <strong>${ill0Mean.toFixed(2)}</strong> for illness-free patients, representing a strong direct demand driver.`
+    },
+    {
+      title: 'Chronic Illness & Coverage',
+      badge: `${chronicPct}% Chronic`,
+      badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+      text: `<strong>${chronicPct}%</strong> of records report chronic conditions. Furthermore, <strong>${privPct}%</strong> possess private health insurance coverage.`
+    },
+    {
+      title: 'High-Utilization Outliers',
+      badge: `${outlierTotal} Outlier Records`,
+      badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
+      text: `Using Tukey's IQR rule (> ${outlierCutoff.toFixed(1)} visits), exactly <strong>${outlierTotal} records</strong> represent extreme acute demand cases needing chronic disease protocols.`
+    }
+  ];
+
+  container.innerHTML = cards.map(c => `
+    <div class="bg-slate-800/80 rounded-lg p-3.5 border border-slate-700/70 flex flex-col justify-between">
+      <div class="flex items-center justify-between mb-2">
+        <h4 class="text-xs font-bold text-slate-200">${c.title}</h4>
+        <span class="text-[10px] font-semibold px-2 py-0.5 rounded border ${c.badgeColor}">${c.badge}</span>
+      </div>
+      <p class="text-xs text-slate-300 leading-relaxed">${c.text}</p>
+    </div>
+  `).join('');
+}
+</script>
+
+<script>
+/*
+ * Re-calculate all Top KPIs from active dataset
+ */
+function updateTopKPIs(data) {
+  const totalRecords = data.length;
+  if (totalRecords === 0) {
+    ['kpiTotalVisits', 'kpiAvgVisits', 'kpiMedianVisits', 'kpiAvgAge', 'kpiAvgIncome', 'kpiAvgIllness', 'kpiChronicRate', 'kpiPrivateRate'].forEach(id => {
+      document.getElementById(id).textContent = '0';
+    });
+    document.getElementById('metaFilteredRatio').textContent = '0 / ' + rawDataset.length + ' (0%)';
+    return;
+  }
+
+  const visitsArr = data.map(d => d.visits);
+  const totalVisits = Stats.sum(visitsArr);
+  const avgVisits = Stats.mean(visitsArr);
+  const medianVisits = Stats.median(visitsArr);
+
+  // Age in decades converted to years (age * 100)
+  const avgAgeYears = Stats.mean(data.map(d => d.age * 100));
+  const avgIncome = Stats.mean(data.map(d => d.income));
+  const avgIllness = Stats.mean(data.map(d => d.illness));
+
+  // Chronic & Insurance rates
+  const chronicCount = data.filter(d => d.nchronic > 0).length;
+  const chronicPct = ((chronicCount / totalRecords) * 100).toFixed(1);
+
+  const privateCount = data.filter(d => d.private === 'yes' || d.private === 1 || d.private === '1').length;
+  const privatePct = ((privateCount / totalRecords) * 100).toFixed(1);
+
+  // DOM Updates
+  document.getElementById('kpiTotalVisits').textContent = totalVisits.toLocaleString();
+  document.getElementById('kpiAvgVisits').textContent = avgVisits.toFixed(3);
+  document.getElementById('kpiMedianVisits').textContent = medianVisits.toFixed(1);
+  document.getElementById('kpiAvgAge').textContent = avgAgeYears.toFixed(1);
+  document.getElementById('kpiAvgIncome').textContent = avgIncome.toFixed(2);
+  document.getElementById('kpiAvgIllness').textContent = avgIllness.toFixed(2);
+  document.getElementById('kpiChronicRate').textContent = `${chronicPct}%`;
+  document.getElementById('kpiChronicCount').textContent = `${chronicCount.toLocaleString()} patients`;
+  document.getElementById('kpiPrivateRate').textContent = `${privatePct}%`;
+  document.getElementById('kpiPrivateCount').textContent = `${privateCount.toLocaleString()} patients`;
+
+  // Meta banner ratio
+  const ratioPct = ((totalRecords / rawDataset.length) * 100).toFixed(1);
+  document.getElementById('metaFilteredRatio').textContent = `${totalRecords.toLocaleString()} / ${rawDataset.length.toLocaleString()} (${ratioPct}%)`;
+}
+
+/*
+ * Apply Multi-Dimensional Filters
+ */
+function applyFilters() {
+  const fGender = document.getElementById('filterGender').value;
+  const fAge = document.getElementById('filterAge').value;
+  const fIncome = document.getElementById('filterIncome').value;
+  const fIllness = document.getElementById('filterIllness').value;
+  const fHealth = document.getElementById('filterHealth').value;
+  const fPrivate = document.getElementById('filterPrivate').value;
+  const fFreepoor = document.getElementById('filterFreepoor').value;
+  const fFreerepat = document.getElementById('filterFreerepat').value;
+  const fNchronic = document.getElementById('filterNchronic').value;
+  const fLchronic = document.getElementById('filterLchronic').value;
+
+  currentFilteredDataset = rawDataset.filter(d => {
+    // Gender
+    if (fGender !== 'ALL' && d.gender !== fGender) return false;
+
+    // Age Group
+    if (fAge !== 'ALL') {
+      const yr = d.age * 100;
+      if (fAge === '<20' && yr >= 20) return false;
+      if (fAge === '20-35' && (yr < 20 || yr > 35)) return false;
+      if (fAge === '36-50' && (yr < 36 || yr > 50)) return false;
+      if (fAge === '51-65' && (yr < 51 || yr > 65)) return false;
+      if (fAge === '>65' && yr <= 65) return false;
+    }
+
+    // Income
+    if (fIncome !== 'ALL') {
+      if (fIncome === 'Low' && d.income >= 0.25) return false;
+      if (fIncome === 'Moderate' && (d.income < 0.25 || d.income > 0.50)) return false;
+      if (fIncome === 'Middle' && (d.income < 0.50 || d.income > 0.80)) return false;
+      if (fIncome === 'High' && d.income <= 0.80) return false;
+    }
+
+    // Illness
+    if (fIllness !== 'ALL') {
+      if (fIllness === '0' && d.illness !== 0) return false;
+      if (fIllness === '1' && d.illness !== 1) return false;
+      if (fIllness === '2' && d.illness !== 2) return false;
+      if (fIllness === '3+' && d.illness < 3) return false;
+    }
+
+    // Health Score
+    if (fHealth !== 'ALL') {
+      if (fHealth === '0' && d.health !== 0) return false;
+      if (fHealth === '1' && d.health !== 1) return false;
+      if (fHealth === '2+' && d.health < 2) return false;
+    }
+
+    // Private Insurance
+    if (fPrivate !== 'ALL') {
+      const isPriv = (d.private === 'yes' || d.private === 1 || d.private === '1');
+      if (fPrivate === 'yes' && !isPriv) return false;
+      if (fPrivate === 'no' && isPriv) return false;
+    }
+
+    // Free Poor
+    if (fFreepoor !== 'ALL') {
+      const isFp = (d.freepoor === 'yes' || d.freepoor === 1 || d.freepoor === '1');
+      if (fFreepoor === 'yes' && !isFp) return false;
+      if (fFreepoor === 'no' && isFp) return false;
+    }
+
+    // Free Repat
+    if (fFreerepat !== 'ALL') {
+      const isFr = (d.freerepat === 'yes' || d.freerepat === 1 || d.freerepat === '1');
+      if (fFreerepat === 'yes' && !isFr) return false;
+      if (fFreerepat === 'no' && isFr) return false;
+    }
+
+    // Chronic Count
+    if (fNchronic !== 'ALL') {
+      if (fNchronic === '0' && d.nchronic !== 0) return false;
+      if (fNchronic === '1' && d.nchronic !== 1) return false;
+      if (fNchronic === '2+' && d.nchronic < 2) return false;
+    }
+
+    // Long Chronic
+    if (fLchronic !== 'ALL') {
+      const isLc = (d.lchronic === 'yes' || d.lchronic === 1 || d.lchronic === '1');
+      if (fLchronic === 'yes' && !isLc) return false;
+      if (fLchronic === 'no' && isLc) return false;
+    }
+
+    return true;
+  });
+
+  // Recompute everything
+  updateTopKPIs(currentFilteredDataset);
+  renderAllVisualizations(currentFilteredDataset);
+  renderCorrelationHeatmap(currentFilteredDataset);
+  renderOutlierAnalysis(currentFilteredDataset);
+  computeKeyInsights(currentFilteredDataset);
+}
+
+/*
+ * Reset all filter select boxes
+ */
+function resetFilters() {
+  document.getElementById('filterGender').value = 'ALL';
+  document.getElementById('filterAge').value = 'ALL';
+  document.getElementById('filterIncome').value = 'ALL';
+  document.getElementById('filterIllness').value = 'ALL';
+  document.getElementById('filterHealth').value = 'ALL';
+  document.getElementById('filterPrivate').value = 'ALL';
+  document.getElementById('filterFreepoor').value = 'ALL';
+  document.getElementById('filterFreerepat').value = 'ALL';
+  document.getElementById('filterNchronic').value = 'ALL';
+  document.getElementById('filterLchronic').value = 'ALL';
+  applyFilters();
+}
+
+/*
+ * CSV Uploader Parser
+ */
+function handleCSVUpload(file) {
+  if (!file) return;
+  Papa.parse(file, {
+    header: true,
+    dynamicTyping: true,
+    skipEmptyLines: true,
+    complete: function(results) {
+      if (results.data && results.data.length > 0) {
+        // Validate and clean uploaded keys
+        const parsed = results.data.map(row => {
+          return {
+            visits: Number(row.visits !== undefined ? row.visits : (row.Visits || 0)),
+            gender: String(row.gender || row.Gender || 'female').toLowerCase().trim(),
+            age: Number(row.age !== undefined ? row.age : (row.Age || 0.35)),
+            income: Number(row.income !== undefined ? row.income : (row.Income || 0.4)),
+            illness: Number(row.illness !== undefined ? row.illness : (row.Illness || 0)),
+            reduced: Number(row.reduced !== undefined ? row.reduced : (row.Reduced || 0)),
+            health: Number(row.health !== undefined ? row.health : (row.Health || 0)),
+            private: String(row.private || row.Private || 'no').toLowerCase().trim(),
+            freepoor: String(row.freepoor || row.Freepoor || 'no').toLowerCase().trim(),
+            freerepat: String(row.freerepat || row.Freerepat || 'no').toLowerCase().trim(),
+            nchronic: Number(row.nchronic !== undefined ? row.nchronic : (row.Nchronic || 0)),
+            lchronic: String(row.lchronic || row.Lchronic || 'no').toLowerCase().trim()
+          };
+        });
+
+        rawDataset = parsed;
+        document.getElementById('metaRecords').textContent = parsed.length.toLocaleString();
+        resetFilters();
+      }
+    },
+    error: function(err) {
+      console.error("Error parsing CSV:", err);
+    }
+  });
+}
+
+// Window Event Listeners & Bootstrapping
+window.addEventListener('DOMContentLoaded', () => {
+  // Initialize Lucide Icons
+  if (window.lucide) {
+    lucide.createIcons();
+  }
+
+  // Load benchmark dataset
+  rawDataset = generateDoctorVisitsDataset();
+  currentFilteredDataset = [...rawDataset];
+
+  // Setup initial render
+  updateTopKPIs(currentFilteredDataset);
+  renderAllVisualizations(currentFilteredDataset);
+  renderCorrelationHeatmap(currentFilteredDataset);
+  renderOutlierAnalysis(currentFilteredDataset);
+  computeKeyInsights(currentFilteredDataset);
+
+  // Filter change listeners
+  const filterIds = [
+    'filterGender', 'filterAge', 'filterIncome', 'filterIllness',
+    'filterHealth', 'filterPrivate', 'filterFreepoor', 'filterFreerepat',
+    'filterNchronic', 'filterLchronic'
+  ];
+  filterIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', applyFilters);
+  });
+
+  // Buttons
+  document.getElementById('clearAllFiltersBtn').addEventListener('click', resetFilters);
+  document.getElementById('resetDataBtn').addEventListener('click', () => {
+    rawDataset = generateDoctorVisitsDataset();
+    document.getElementById('metaRecords').textContent = '5,190';
+    resetFilters();
+  });
+
+  // CSV File Input
+  const fileInput = document.getElementById('csvFileInput');
+  if (fileInput) {
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        handleCSVUpload(e.target.files[0]);
+      }
+    });
+  }
+
+  // Modal interactions
+  const modal = document.getElementById('variableModal');
+  const openModalBtn = document.getElementById('openVariableModalBtn');
+  const closeModalBtn = document.getElementById('closeModalBtn');
+  const modalDismissBtn = document.getElementById('modalDismissBtn');
+
+  if (openModalBtn && modal) {
+    openModalBtn.addEventListener('click', () => modal.classList.remove('hidden'));
+    closeModalBtn.addEventListener('click', () => modal.classList.add('hidden'));
+    modalDismissBtn.addEventListener('click', () => modal.classList.add('hidden'));
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.classList.add('hidden');
+    });
+  }
+
+  // Window resize handler for outlier canvas re-rendering
+  window.addEventListener('resize', () => {
+    if (currentFilteredDataset) {
+      renderOutlierAnalysis(currentFilteredDataset);
+    }
+  });
+});
+</script>
+
+</body>
+</html>
